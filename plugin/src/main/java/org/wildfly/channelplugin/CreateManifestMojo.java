@@ -5,10 +5,12 @@ import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
+import org.apache.maven.project.MavenProjectHelper;
 import org.wildfly.channel.ChannelManifest;
 import org.wildfly.channel.ChannelManifestMapper;
 import org.wildfly.channel.Stream;
@@ -29,19 +31,12 @@ import java.util.stream.Collectors;
  * \and dependencies of children projects.
  */
 @Mojo(name = "create-manifest", requiresProject = true, requiresDirectInvocation = true,
-        requiresDependencyResolution = ResolutionScope.TEST,
-        aggregator = true
+        requiresDependencyResolution = ResolutionScope.TEST, aggregator = true, defaultPhase = LifecyclePhase.PACKAGE
 )
 public class CreateManifestMojo extends AbstractMojo {
 
     @Inject
     MavenProject mavenProject;
-
-    /**
-     * The file to write the generated manifest to. If not specified the manifest is printed to the output
-     */
-    @Parameter(name="outputFile", property = "outputFile")
-    private File outputFile;
 
     /**
      * The scopes to exclude. By default, excludes "test" and "provided" scopes.
@@ -66,6 +61,12 @@ public class CreateManifestMojo extends AbstractMojo {
      */
     @Parameter(name="manifestDescription", property = "manifestDescription")
     private String manifestDescription;
+
+    @Inject
+    private MavenProject project;
+
+    @Inject
+    private MavenProjectHelper projectHelper;
 
 
     @Override
@@ -128,11 +129,9 @@ public class CreateManifestMojo extends AbstractMojo {
 
         try {
             final String yaml = ChannelManifestMapper.toYaml(channelManifest);
-            if (outputFile != null) {
-                FileUtils.writeStringToFile(outputFile, yaml, StandardCharsets.UTF_8);
-            } else {
-                System.out.println(yaml);
-            }
+            final File file = new File("target/manifest.yaml");
+            FileUtils.writeStringToFile(file, yaml, StandardCharsets.UTF_8);
+            projectHelper.attachArtifact(project, "yaml", "manifest", file);
         } catch (IOException e) {
             throw new MojoExecutionException("Unable to serialize manifest", e);
         }
